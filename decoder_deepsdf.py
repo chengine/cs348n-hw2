@@ -187,6 +187,7 @@ def plot_loss(dir):
 
 #############################################################################
 # Complete this function
+delta = torch.tensor(truncation).cuda()
 def train_epoch(epoch_curr, train_loader, z_in, opt_z, opt_net=None):
     loss_sum = 0.
     print_every = 10
@@ -201,9 +202,15 @@ def train_epoch(epoch_curr, train_loader, z_in, opt_z, opt_net=None):
         opt_z.zero_grad()
         ##################################################
         z_batch = torch.index_select(z_in, 0, idx)  # B x C
-        ...
-        sdf_loss = ...
-        z_regul = ...
+
+        z_batch = z_batch[..., None].expand(-1, -1, num_xyz)
+        z_batch = torch.permute(z_batch, (0, 2, 1))     # B x N x C
+        input = torch.cat([xyz_pts, z_batch], dim=-1)   # B x N x (3 + C)
+        output = decoder(input)         # B x N x 1
+        clamp = torch.minimum(delta, torch.maximum(-delta, sdf_gt))
+
+        sdf_loss = torch.sum(torch.abs(output - clamp))
+        z_regul = torch.sum(l2_regul* num_xyz*torch.linalg.norm(z_batch, ord=2, dim=-1)**2)
         ##################################################
         loss_all = z_regul + sdf_loss
         loss_all.backward()

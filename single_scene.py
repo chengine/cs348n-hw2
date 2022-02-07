@@ -23,6 +23,7 @@ from models.code_conv3D import *
 
 # Run this command for training
 # python -i single_scene.py --epoch 2000 --name deepsdf --gpu 0 --trunc 0.1 --lr 2e-4
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def parse_args():
     '''PARAMETERS'''
@@ -170,8 +171,10 @@ def train_epoch(train_loader, opt_net):
         opt_net.zero_grad()
         ################################################
         # implement loss = |F(x)-SDF(x)|
-        sdf_pred = ...
-        sdf_loss = ...      
+        sdf_pred = decoder(xyz_pts)
+        delta = torch.tensor([0.1], device=device)
+        clamp = torch.minimum(delta, torch.maximum(-delta, sdf_gt))
+        sdf_loss = torch.mean(torch.abs(sdf_pred - clamp))   
         ################################################
         sdf_loss.backward()
         opt_net.step()
@@ -181,6 +184,7 @@ def train_epoch(train_loader, opt_net):
 import time
 
 if __name__ == "__main__":
+
     save_point = os.path.join(create_date_folder(), args.name)
 
     os.system('mkdir -p ' + save_point)

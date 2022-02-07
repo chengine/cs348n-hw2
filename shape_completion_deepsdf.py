@@ -110,17 +110,24 @@ def train_epoch(epoch_curr, train_loader, z, opt_z, opt_net=None):
         ##############################################################
         z_repeat = z_batch.unsqueeze(1).expand(-1, 2*N, -1)  # B x 2N x C
 
-        pts_input = ...  # B x 2N x (C+3)
-        sdf_pred = ...  # B x 2N x 1
+        pts_input =  torch.cat([pts_all, z_repeat], dim=-1) # B x 2N x (C+3)
+        sdf_pred = decoder(pts_input)  # B x 2N x 1
         # B x 2N x 3
-        normal_raw = grad(...
+        normal_raw = grad(outputs=sdf_pred, inputs=pts_all,
+            grad_outputs=torch.ones(sdf_pred.size()).cuda(),
+            create_graph=True, retain_graph=True,
+            only_inputs=True)[0]
 
         # sdf_pred: B x 2N x 1, normal_raw: B x 2N x 3
-        loss_sdf = ...
-        normal_pred = ...
-        loss_normal = ...
-        loss_eikonal = ...
-        z_regul = ...
+        surface_SDF = sdf_pred[..., :N, :]
+        random_SDF = sdf_pred[..., N:, :]
+        surface_normal = normal_raw[..., :N, :]
+        random_normal = normal_raw[..., N:, :]
+
+        loss_sdf = torch.sum(torch.abs(surface_SDF))
+        loss_normal = torch.sum(torch.linalg.norm(surface_normal - norm_in, ord=2, dim=-1))
+        loss_eikonal = torch.sum(torch.abs(torch.linalg.norm(random_normal, ord=2, dim=-1) - 1.))
+        z_regul = torch.sum(l2_regul*(2*N)*torch.linalg.norm(z_batch, ord=2, dim=-1)**2)
         ############################################################
         loss_empty = torch.exp(-100 * sdf_pred[:, num_xyz:].abs()).mean()
         loss_all = z_regul

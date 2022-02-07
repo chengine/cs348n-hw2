@@ -35,11 +35,16 @@ def train(net, optimizer, data_loader, device):
         off_surface = torch.cat((off_surface, uniform), axis=0)
         pts = pts.to(device)
         #####################################################
-        ...
-        loss_pts = ...
-        ...
-        g = autograd.grad(...
-        eikonal_term = ...
+        sdf_pred = net(pts)
+        loss_pts = torch.sum(torch.abs(sdf_pred))
+        off_surface = torch.tensor(off_surface, device=device, requires_grad=True)
+        sdf_pred_off = net(off_surface)
+        g = autograd.grad(outputs=sdf_pred_off, inputs=off_surface,
+            grad_outputs=torch.ones(sdf_pred_off.size()).to(device),
+            create_graph=True, retain_graph=True,
+            only_inputs=True)[0]
+        l2g = torch.linalg.norm(g, ord=2, dim=-1)
+        eikonal_term = torch.sum(torch.abs(l2g - 1.))
         #####################################################
         
         loss = loss_pts + 0.1 * eikonal_term

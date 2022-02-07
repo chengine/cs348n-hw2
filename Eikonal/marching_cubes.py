@@ -25,9 +25,19 @@ def compute_SDFs(net, device, nb_grid):
     z = np.linspace(-1.5, 1.5, nb_grid)
     X, Y, Z = np.meshgrid(x, y, z)
     
-    ...
+    grid_shape = X.shape
 
-    return val
+    X, Y, Z = X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)
+    chunk = 10000
+    with torch.no_grad():
+        points = torch.cat([torch.tensor(X), torch.tensor(Y), torch.tensor(Z)], dim=-1).float().to(device)
+        val = []
+        pts = torch.split(points, chunk)
+        for pt in pts:
+            val.append(net(pt))
+
+        val = torch.cat(val, dim=0)
+    return val.detach().cpu().numpy()
 
 
 if __name__ == '__main__':
@@ -60,3 +70,5 @@ if __name__ == '__main__':
 
     os.makedirs('output', exist_ok=True)
     o3d.io.write_triangle_mesh("output/{}_mesh.ply".format(name), mesh)
+    mesh.compute_vertex_normals()
+    o3d.visualization.draw_geometries([mesh])
